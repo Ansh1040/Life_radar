@@ -5,8 +5,13 @@
   const reminder=document.createElement('label');reminder.className='task-fields';reminder.innerHTML='Reminder <span class="optional">(optional)</span><input name="reminderAt" type="datetime-local"><span class="helper">Android notification at your chosen time. Battery restrictions may delay delivery.</span>';
   document.querySelector('#entry-form button[type="submit"]').before(reminder);
   const views=['today','radar','spending','memory','review'];
+  const identity={today:{label:'Today',detail:'ONE STEP AT A TIME',symbol:'sun'},radar:{label:'Life radar',detail:'YOUR PERSONAL CHECK-IN',symbol:'radar'},spending:{label:'Spending',detail:'YOUR MONEY, IN FOCUS',symbol:'wallet'},memory:{label:'Notes to self',detail:'THOUGHTS WORTH KEEPING',symbol:'notebook'},review:{label:'Review',detail:'SEE HOW FAR YOU’VE COME',symbol:'chart'}};
   const paths={today:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/>',spending:'<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 8h18m-5 5h5"/><circle cx="16" cy="14" r=".5"/>',memory:'<rect x="5" y="3" width="15" height="18" rx="2"/><path d="M8 3v18m3-13h6m-6 4h6M3 7h3m-3 5h3m-3 5h3"/>',review:'<path d="M4 3v17h17M8 15l4-4 4 2 5-7"/>'};
-  document.querySelectorAll('.symbol-nav [data-view]').forEach(button=>{button.innerHTML=`<svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[button.dataset.view]}</svg>`;});
+  const icon=key=>`<svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[key]}</svg>`;
+  document.querySelectorAll('.symbol-nav [data-view]').forEach(button=>{button.innerHTML=icon(button.dataset.view)+`<span class="nav-active-label" aria-hidden="true">${identity[button.dataset.view].label}</span>`;});
+  const topbar=document.querySelector('.topbar'), brand=document.querySelector('.brand');
+  topbar.querySelector(':scope > span')?.remove();topbar.prepend(brand);
+  const sectionIcon=brand.querySelector('.brand-icon');sectionIcon.classList.add('section-icon');
   const controls=document.createElement('div'); controls.className='topbar-actions';
   const capture=document.querySelector('#capture'); capture.before(controls);controls.append(capture);
   const theme=document.createElement('button');theme.className='theme-toggle';controls.prepend(theme);
@@ -24,6 +29,18 @@
     const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>sheet.close();sheet.append(cancel);sheet.showModal();
   }
   function enhance(){
+    const current=api.currentView(), info=identity[current];
+    document.documentElement.dataset.page=current;
+    sectionIcon.innerHTML=icon(current);
+    brand.querySelector('small').textContent=info.detail;
+    document.title=`${info.label} · Life Radar`;
+    const motif=document.querySelector('.radar-art');
+    motif.innerHTML=`<div class="page-motif motif-${current}">${icon(current)}<span>${current==='today'?'MAKE TODAY COUNT':current==='radar'?'STAY IN ORBIT':current==='spending'?'MONEY IN · MONEY OUT':current==='memory'?'DEAR FUTURE ME':'SMALL STEPS ADD UP'}</span></div>`;
+    motif.setAttribute('aria-hidden','true');
+    const intro=document.querySelector('.intro');
+    let chapter=intro.querySelector('.page-chapter');
+    if(!chapter){chapter=document.createElement('p');chapter.className='page-chapter';intro.firstElementChild.prepend(chapter);}
+    chapter.textContent={today:'THE DAILY EDIT',radar:'ON YOUR RADAR',spending:'THE MONEY JOURNAL',memory:'YOUR PERSONAL LETTERS',review:'THE BIGGER PICTURE'}[current];
     content.querySelectorAll('[data-delete]').forEach(button=>{
       const row=button.closest('.task,.radar-item,.past-note,.expense');if(!row||row.dataset.swipeId)return;
       const [type,id]=button.dataset.delete.split(':');row.dataset.swipeType=type;row.dataset.swipeId=id;row.classList.add('swipe-target');

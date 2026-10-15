@@ -54,7 +54,20 @@ try{
   page.once('dialog',dialog=>dialog.accept());await page.locator('#import').setInputFiles(backupFile);
   await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('restored'));
   await page.setViewportSize({width:320,height:740});
-  for(const view of ['today','radar','spending','memory','review']){await page.locator(`[data-view=${view}]`).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Overflow in ${view}`);}
+  for(const view of ['today','radar','spending','memory','review']){
+    await page.locator(`[data-view=${view}]`).click();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Overflow in ${view}`);
+    assert.equal(await page.locator('html').getAttribute('data-page'),view);
+    assert.equal(await page.locator('.nav-active-label:visible').count(),1);
+    const navBoxes=await page.locator('.symbol-nav button').evaluateAll(buttons=>buttons.map(b=>b.getBoundingClientRect().y));
+    assert.ok(Math.max(...navBoxes)-Math.min(...navBoxes)<2,`Navigation wrapped in ${view}`);
+    const header=await page.locator('.topbar .brand').boundingBox(),controls=await page.locator('.topbar-actions').boundingBox();
+    assert.ok(header.x+header.width<=controls.x+1,`Header collision in ${view}`);
+    assert.ok(header.y>=0,`Header outside viewport in ${view}`);
+    await page.setViewportSize({width:390,height:844});await page.evaluate(()=>scrollTo(0,0));
+    await page.screenshot({path:new URL(`./artifacts/page-${view}.png`,import.meta.url).pathname.replace(/^\/(\w:)/,'$1')});
+    await page.setViewportSize({width:320,height:740});
+  }
   await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('life-radar-v1'));const base=d.expenses[0];d.expenses=Array.from({length:1000},(_,i)=>({...base,id:`stress-${i}`,title:`Expense ${i}`}));localStorage.setItem('life-radar-v1',JSON.stringify(d));});
   await page.reload();const start=performance.now();await page.locator('[data-view=spending]').click();await page.locator('#spending-calendar').waitFor();const latency=Math.round(performance.now()-start);
   console.log(`Browser checks passed: forms, edit source rule, real pointer swipes, timer, calendar, theme persistence, backup round-trip, 320px layout. 1,000-entry Spending render: ${latency}ms.`);

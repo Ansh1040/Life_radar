@@ -18,21 +18,32 @@ public final class MainActivity extends Activity {
     private String pendingExport;
     private String pendingReminders = "[]";
     private static final String HOST = "appassets.androidplatform.net";
-    private static final Set<String> FILES = new HashSet<>(Arrays.asList("index.html","app.js","ui.js","styles.css","theme.css"));
+    private static final Set<String> FILES = new HashSet<>(Arrays.asList("index.html","app.js","ui.js","styles.css","theme.css","pages.css"));
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.rgb(17,21,40));
         getWindow().setNavigationBarColor(Color.rgb(17,21,40));
         web = new WebView(this);
         web.setBackgroundColor(Color.rgb(17,21,40));
-        setContentView(web);
+        android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(17,21,40));
+        root.addView(web,new android.widget.FrameLayout.LayoutParams(-1,-1));
+        setContentView(root);
         if (android.os.Build.VERSION.SDK_INT >= 30) {
-            web.setOnApplyWindowInsetsListener((view,insets)->{
+            getWindow().setDecorFitsSystemWindows(false);
+            root.setOnApplyWindowInsetsListener((view,insets)->{
                 android.graphics.Insets safe = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout() | android.view.WindowInsets.Type.ime());
                 view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
                 return android.view.WindowInsets.CONSUMED;
             });
-            web.requestApplyInsets();
+            root.requestApplyInsets();
+            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            if(controller!=null){
+                controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                controller.hide(android.view.WindowInsets.Type.statusBars());
+            }
+        } else {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
         }
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,()->handleBack());
@@ -119,5 +130,6 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==30){ReminderReceiver.schedule(this,pendingReminders);Toast.makeText(this,results.length>0 && results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED ? "Task notifications enabled" : "Enable Life Radar notifications in app settings to receive reminders",Toast.LENGTH_LONG).show();}}
     @Override protected void onPause(){super.onPause();web.onPause();}
     @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
+    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused && android.os.Build.VERSION.SDK_INT>=30){android.view.WindowInsetsController controller=getWindow().getInsetsController();if(controller!=null)controller.hide(android.view.WindowInsets.Type.statusBars());}}
     @Override protected void onDestroy(){if(upload!=null)upload.onReceiveValue(null);web.destroy();super.onDestroy();}
 }
