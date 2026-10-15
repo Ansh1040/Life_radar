@@ -5,6 +5,12 @@
   const reminder=document.createElement('label');reminder.className='task-fields';reminder.innerHTML='Reminder <span class="optional">(optional)</span><input name="reminderAt" type="datetime-local"><span class="helper">Android notification at your chosen time. Battery restrictions may delay delivery.</span>';
   document.querySelector('#entry-form button[type="submit"]').before(reminder);
   const views=['today','radar','spending','memory','review'];
+  let lastView=null;
+  const syncHeader=()=>{
+    const root=document.documentElement;
+    if(window.scrollY>80)root.classList.add('is-scrolled');
+    else if(window.scrollY<20)root.classList.remove('is-scrolled');
+  };
   const identity={today:{label:'Today',detail:'ONE STEP AT A TIME',symbol:'sun'},radar:{label:'Life radar',detail:'YOUR PERSONAL CHECK-IN',symbol:'radar'},spending:{label:'Spending',detail:'YOUR MONEY, IN FOCUS',symbol:'wallet'},memory:{label:'Notes to self',detail:'THOUGHTS WORTH KEEPING',symbol:'notebook'},review:{label:'Review',detail:'SEE HOW FAR YOU’VE COME',symbol:'chart'}};
   const paths={today:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/>',spending:'<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 8h18m-5 5h5"/><circle cx="16" cy="14" r=".5"/>',memory:'<rect x="5" y="3" width="15" height="18" rx="2"/><path d="M8 3v18m3-13h6m-6 4h6M3 7h3m-3 5h3m-3 5h3"/>',review:'<path d="M4 3v17h17M8 15l4-4 4 2 5-7"/>'};
   const icon=key=>`<svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[key]}</svg>`;
@@ -30,6 +36,8 @@
   }
   function enhance(){
     const current=api.currentView(), info=identity[current];
+    if(lastView!==null && lastView!==current){document.documentElement.classList.remove('is-scrolled');window.scrollTo({top:0,behavior:'instant'});}
+    lastView=current;
     document.documentElement.dataset.page=current;
     sectionIcon.innerHTML=icon(current);
     brand.querySelector('small').textContent=info.detail;
@@ -47,7 +55,8 @@
       const at=type==='tasks'?api.getReminder(id):'';if(at){const label=document.createElement('div');label.className='meta';label.textContent='Reminder · '+new Date(at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});row.querySelector('.task-text')?.append(label);}
       const more=document.createElement('button');more.type='button';more.className='entry-menu';more.textContent='⋯';more.setAttribute('aria-label','Actions for this entry');more.onclick=()=>showActions(type,id);button.before(more);
     });
-    if(!content.querySelector('.gesture-help')){const help=document.createElement('p');help.className='gesture-help';help.textContent='Swipe an entry right to edit, left for actions. Swipe empty space to switch sections.';content.prepend(help);}
+    if(!content.querySelector('.gesture-help')){const help=document.createElement('details');help.className='gesture-help';const summary=document.createElement('summary');summary.textContent='Swipe tips';const text=document.createElement('p');text.textContent='Swipe an entry right to edit, left for actions. Swipe empty space to switch sections.';help.append(summary,text);content.prepend(help);}
+    syncHeader();
   }
   globalThis.LifeRadarUI={enhance};enhance();
   let gesture=null;
@@ -61,4 +70,7 @@
   let scheduled=false,point=null;
   if(!reduce)document.addEventListener('pointermove',event=>{if(event.pointerType==='touch'||document.hidden)return;point={x:event.clientX,y:event.clientY};if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;document.documentElement.style.setProperty('--pointer-x',`${point.x/innerWidth*100}%`);document.documentElement.style.setProperty('--pointer-y',`${point.y/innerHeight*100}%`);});},{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)gesture=null;});
+  let scrollPending=false;
+  window.addEventListener('scroll',()=>{if(scrollPending)return;scrollPending=true;requestAnimationFrame(()=>{scrollPending=false;syncHeader();});},{passive:true});
+  syncHeader();
 })();

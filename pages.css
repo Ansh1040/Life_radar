@@ -33,3 +33,47 @@
 }
 @media(max-width:680px){.sidebar .symbol-nav{flex-wrap:nowrap}.sidebar .symbol-nav button{width:auto;flex:1;min-width:0}.sidebar .symbol-nav .nav-active-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:8px!important}}
 @media(max-width:350px){.topbar{padding-inline:14px;gap:5px}.topbar .brand{font-size:20px;gap:6px}.topbar .brand small{font-size:6px}.topbar .brand-icon{width:30px;height:32px}.theme-toggle,#capture{width:31px;height:33px}.topbar-actions{gap:4px}.intro h1{font-size:25px}.radar-art{width:62px}.page-motif{width:60px;height:76px}.money-summary strong{font-size:15px}}
+
+/* Compact chrome keeps the current section visible without covering the content. */
+.topbar{position:relative;isolation:isolate;overflow:hidden;min-height:78px}
+.topbar::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.35;background-image:radial-gradient(ellipse at 88% 0%,color-mix(in srgb,var(--section-accent) 25%,transparent),transparent 65%),repeating-linear-gradient(135deg,transparent 0 15px,color-mix(in srgb,var(--section-accent) 11%,transparent) 15px 16px);mask-image:linear-gradient(90deg,transparent 15%,#000 100%)}
+[data-page="radar"] .topbar::before{background-image:repeating-radial-gradient(circle at 90% 0%,transparent 0 14px,color-mix(in srgb,var(--section-accent) 16%,transparent) 15px 16px)}
+[data-page="memory"] .topbar::before{background-image:repeating-linear-gradient(0deg,transparent 0 11px,color-mix(in srgb,var(--section-accent) 16%,transparent) 12px 13px)}
+[data-page="review"] .topbar::before{background-image:radial-gradient(circle,color-mix(in srgb,var(--section-accent) 32%,transparent) 1px,transparent 1.5px),linear-gradient(135deg,transparent 60%,color-mix(in srgb,var(--section-accent) 15%,transparent));background-size:12px 12px,100% 100%}
+.gesture-help{padding:0;margin:0 0 14px;color:var(--muted)}
+.gesture-help summary{cursor:pointer;width:max-content;min-height:28px;display:list-item;font-size:10px;line-height:28px}
+.gesture-help p{max-width:420px;line-height:1.7;margin:4px 0 12px;font-size:11px}
+@media(max-width:680px){
+  .topbar{position:sticky;min-height:66px;padding:9px 18px;gap:8px}
+  .topbar .brand{font-size:21px;gap:8px}
+  .topbar .brand small{margin-top:3px;font-size:6px;line-height:1.4;letter-spacing:.5px}
+  .topbar .brand-icon{width:31px;height:33px;border-radius:9px}
+  .section-icon svg{width:21px;height:21px}
+  .intro{padding:18px 0 13px}
+  .intro .page-chapter{margin-bottom:7px!important;font-size:8px!important}
+  .intro #date{margin-bottom:9px;font-size:8px;letter-spacing:1px}
+  .intro h1{font-size:25px;line-height:1.16}
+  .intro #subtitle{margin:10px 0 0;font-size:11px}
+  .radar-art{height:80px;width:65px}
+  .page-motif{width:62px;height:76px}
+  .motif-radar{height:62px}
+  .page-motif svg{width:27px;height:27px}
+  [data-page="review"] .intro h1{font-size:24px}
+  [data-page="review"] .intro #subtitle{max-width:240px;line-height:1.5}
+  [data-page="review"] .intro .page-chapter{letter-spacing:1px}
+  [data-page="review"] #content>.panel:first-of-type{padding:16px}
+  [data-page="review"] #content>.panel:first-of-type .panel-head{margin-bottom:10px}
+  [data-page="review"] #content>.panel:first-of-type .tabs{margin-bottom:8px}
+  [data-page="review"] #content>.panel:first-of-type .helper{margin-bottom:0}
+  .is-scrolled .topbar{min-height:52px;padding-block:7px;box-shadow:0 3px 16px #080c1c22}
+  .is-scrolled .topbar .brand{font-size:19px}
+  .is-scrolled .topbar .brand small{display:none}
+  .is-scrolled .topbar .brand-icon{width:29px;height:30px}
+  .sidebar .symbol-nav{min-height:66px;padding:5px;bottom:8px;border-radius:22px}
+  .sidebar .symbol-nav button{height:52px;gap:4px}
+  .is-scrolled .sidebar .symbol-nav{min-height:60px;padding:4px}
+  .is-scrolled .sidebar .symbol-nav button{height:48px}
+  .shell{padding-bottom:90px}
+  button,[data-calendar-day],.panel,.calendar-details{scroll-margin-top:70px;scroll-margin-bottom:90px}
+  #toast{bottom:87px}
+}

@@ -68,6 +68,31 @@ try{
     await page.screenshot({path:new URL(`./artifacts/page-${view}.png`,import.meta.url).pathname.replace(/^\/(\w:)/,'$1')});
     await page.setViewportSize({width:320,height:740});
   }
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'Switch to dark mode',exact:true}).click();
+  await page.locator('[data-view=review]').click();await page.evaluate(()=>scrollTo(0,0));
+  await page.waitForFunction(()=>!document.documentElement.classList.contains('is-scrolled'));
+  const expandedHeight=await page.locator('.topbar').evaluate(el=>el.getBoundingClientRect().height);
+  assert.ok(expandedHeight<=68,`Expanded header too tall: ${expandedHeight}`);
+  const reviewTop=await page.locator('#content>.panel').first().evaluate(el=>el.getBoundingClientRect().top);
+  assert.ok(reviewTop<400,`Review content starts too low: ${reviewTop}`);
+  assert.equal(await page.locator('.gesture-help').getAttribute('open'),null);
+  assert.notEqual(await page.locator('.topbar').evaluate(el=>getComputedStyle(el,'::before').backgroundImage),'none');
+  await page.screenshot({path:new URL('./artifacts/review-compact-top.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1')});
+  await page.evaluate(()=>scrollTo(0,220));
+  await page.waitForFunction(()=>document.documentElement.classList.contains('is-scrolled'));
+  const collapsedHeight=await page.locator('.topbar').evaluate(el=>el.getBoundingClientRect().height);
+  assert.ok(collapsedHeight<=54 && collapsedHeight<expandedHeight,`Header didn't compact: ${collapsedHeight}`);
+  assert.ok(Math.abs((await page.locator('.topbar').boundingBox()).y)<1,'Scrolled header is not pinned');
+  assert.equal(await page.locator('#section-name').isVisible(),true);
+  await page.screenshot({path:new URL('./artifacts/review-compact-scrolled.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1')});
+  await page.evaluate(()=>scrollTo(0,0));await page.waitForFunction(()=>!document.documentElement.classList.contains('is-scrolled'));
+  for(const view of ['memory','today','radar','spending','review']){
+    await page.setViewportSize({width:320,height:740});await page.locator(`[data-view=${view}]`).click();
+    const brand=await page.locator('.topbar .brand').boundingBox(),controls=await page.locator('.topbar-actions').boundingBox();
+    assert.ok(brand.x+brand.width<=controls.x+1,`Compact header overlap in ${view}`);
+  }
+  console.log(`Compact header checks passed: ${expandedHeight}px at top, ${collapsedHeight}px while scrolling; Review content starts at ${Math.round(reviewTop)}px.`);
   await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('life-radar-v1'));const base=d.expenses[0];d.expenses=Array.from({length:1000},(_,i)=>({...base,id:`stress-${i}`,title:`Expense ${i}`}));localStorage.setItem('life-radar-v1',JSON.stringify(d));});
   await page.reload();const start=performance.now();await page.locator('[data-view=spending]').click();await page.locator('#spending-calendar').waitFor();const latency=Math.round(performance.now()-start);
   console.log(`Browser checks passed: forms, edit source rule, real pointer swipes, timer, calendar, theme persistence, backup round-trip, 320px layout. 1,000-entry Spending render: ${latency}ms.`);

@@ -22,7 +22,7 @@ Invoke-Checked "$JdkRoot\bin\jar.exe" @('uf',"$buildRoot\unsigned.apk",'-C',"$bu
 Invoke-Checked "$toolsRoot\zipalign.exe" @('-f','4',"$buildRoot\unsigned.apk","$buildRoot\aligned.apk")
 $keyFile = Join-Path $keyRoot 'personal-debug.keystore'
 if(!(Test-Path -LiteralPath $keyFile)) { Invoke-Checked "$JdkRoot\bin\keytool.exe" @('-genkeypair','-keystore',$keyFile,'-storepass','android','-keypass','android','-alias','liferadar','-keyalg','RSA','-keysize','2048','-validity','10000','-dname','CN=Life Radar Personal Build') }
-$apkPath = Join-Path $artifactRoot 'LifeRadar-1.0.2.apk'
+$apkPath = Join-Path $artifactRoot 'LifeRadar-1.0.3.apk'
 Invoke-Checked "$JdkRoot\bin\java.exe" @('-jar',"$toolsRoot\lib\apksigner.jar",'sign','--ks',$keyFile,'--ks-key-alias','liferadar','--ks-pass','pass:android','--key-pass','pass:android','--out',$apkPath,"$buildRoot\aligned.apk")
 Invoke-Checked "$JdkRoot\bin\java.exe" @('-jar',"$toolsRoot\lib\apksigner.jar",'verify','--verbose',$apkPath)
 Invoke-Checked "$toolsRoot\aapt.exe" @('dump','badging',$apkPath)
