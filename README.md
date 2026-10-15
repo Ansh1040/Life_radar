@@ -10,4 +10,6 @@ Data is stored only in this browser's localStorage. Clearing browser data remove
 
 ## Spending
 
+Choose “＋ Add a category…” in the expense category selector to name your own category. It is saved with the expense, appears in future entries and category breakdowns, and is included in backups. Names are trimmed and matched without case sensitivity to avoid duplicates. Existing categories, including Other, remain available.
+
 Open Spending in the main navigation to manually log an expense with a description, INR amount, date, category and optional note. View totals and category breakdowns for today, the current Monday–Sunday week, month or year, up to today. Amounts are stored as integer paise to keep totals exact. Expenses can be deleted and are included in backup export/restore. Backups from before Spending was added remain compatible. No bank connection or automatic transaction collection is used.
