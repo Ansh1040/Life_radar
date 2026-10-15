@@ -125,3 +125,9 @@ const globalQuick = boot(); globalQuick.node('#capture').onclick(); globalQuick.
 assert.equal(globalQuick.state().expenses[0].source,'quick-capture');
 earned.click({delete:'income:new-id'}); assert.equal(earned.state().income.length,0);
 console.log('Passed: Quick Capture-only editing, Add spending/legacy edit rejection, timestamps, income, net totals, calendar days/navigation, persistence and backup round-trip.');
+for (const [view,label] of Object.entries({today:'Today',radar:'Life radar',spending:'Spending',memory:'Notes to self',review:'Review'})) {
+  app.click({view}); assert.equal(app.node('#section-name').textContent,label);
+}
+const html = await readFile(new URL('./index.html',import.meta.url),'utf8');
+assert.equal((html.match(/data-view="[^"]+"[^>]*aria-label=/g)||[]).length,5);
+console.log('Passed: icon navigation accessible names and current section heading.');
