@@ -1,12 +1,14 @@
 param(
   [string]$SdkRoot = "$env:LOCALAPPDATA\Android\Sdk",
-  [string]$JdkRoot = 'C:\Program Files\Java\jdk-19'
+  [string]$JdkRoot = 'C:\Program Files\Java\jdk-21.0.12.1',
+  [string]$ToolsRoot = '',
+  [string]$AndroidJar = ''
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $buildRoot = Join-Path $PSScriptRoot 'build'
-$toolsRoot = Join-Path $SdkRoot 'build-tools\33.0.0'
-$androidJar = Join-Path $SdkRoot 'platforms\android-33\android.jar'
+if (!$ToolsRoot) { $ToolsRoot = Join-Path $SdkRoot 'build-tools\36.0.0' }
+if (!$AndroidJar) { $AndroidJar = Join-Path $SdkRoot 'platforms\android-36\android.jar' }
 $artifactRoot = Join-Path $projectRoot 'artifacts'
 $keyRoot = Join-Path $PSScriptRoot 'signing'
 foreach ($folder in @($buildRoot,$artifactRoot,$keyRoot,"$buildRoot\classes","$buildRoot\assets","$buildRoot\dex")) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
@@ -20,7 +22,7 @@ Invoke-Checked "$JdkRoot\bin\jar.exe" @('uf',"$buildRoot\unsigned.apk",'-C',"$bu
 Invoke-Checked "$toolsRoot\zipalign.exe" @('-f','4',"$buildRoot\unsigned.apk","$buildRoot\aligned.apk")
 $keyFile = Join-Path $keyRoot 'personal-debug.keystore'
 if(!(Test-Path -LiteralPath $keyFile)) { Invoke-Checked "$JdkRoot\bin\keytool.exe" @('-genkeypair','-keystore',$keyFile,'-storepass','android','-keypass','android','-alias','liferadar','-keyalg','RSA','-keysize','2048','-validity','10000','-dname','CN=Life Radar Personal Build') }
-$apkPath = Join-Path $artifactRoot 'LifeRadar-1.0.0.apk'
+$apkPath = Join-Path $artifactRoot 'LifeRadar-1.0.1.apk'
 Invoke-Checked "$JdkRoot\bin\java.exe" @('-jar',"$toolsRoot\lib\apksigner.jar",'sign','--ks',$keyFile,'--ks-key-alias','liferadar','--ks-pass','pass:android','--key-pass','pass:android','--out',$apkPath,"$buildRoot\aligned.apk")
 Invoke-Checked "$JdkRoot\bin\java.exe" @('-jar',"$toolsRoot\lib\apksigner.jar",'verify','--verbose',$apkPath)
 Invoke-Checked "$toolsRoot\aapt.exe" @('dump','badging',$apkPath)

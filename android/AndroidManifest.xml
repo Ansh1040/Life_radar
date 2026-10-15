@@ -1,5 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.liferadar.personal" android:versionCode="1" android:versionName="1.0.0">
-    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="33" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="app.liferadar.personal" android:versionCode="2" android:versionName="1.0.1">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application android:label="Life Radar" android:icon="@drawable/app_icon" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">

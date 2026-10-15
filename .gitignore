@@ -8,5 +8,6 @@ Thumbs.db
 life-radar-*.json
 android/build/
 android/signing/
+android/sdk-downloads/
 artifacts/
 *.apk

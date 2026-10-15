@@ -26,6 +26,17 @@ public final class MainActivity extends Activity {
         web = new WebView(this);
         web.setBackgroundColor(Color.rgb(17,21,40));
         setContentView(web);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            web.setOnApplyWindowInsetsListener((view,insets)->{
+                android.graphics.Insets safe = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout() | android.view.WindowInsets.Type.ime());
+                view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
+                return android.view.WindowInsets.CONSUMED;
+            });
+            web.requestApplyInsets();
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,()->handleBack());
+        }
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -103,7 +114,8 @@ public final class MainActivity extends Activity {
             new Thread(()->{try(OutputStream stream=getContentResolver().openOutputStream(target,"wt")){if(stream==null)throw new IOException();stream.write(json.getBytes(StandardCharsets.UTF_8));runOnUiThread(()->Toast.makeText(this,"Backup saved",Toast.LENGTH_SHORT).show());}catch(Exception ex){runOnUiThread(()->Toast.makeText(this,"Backup could not be saved",Toast.LENGTH_LONG).show());}}).start();
         }
     }
-    @Override public void onBackPressed(){web.evaluateJavascript("(()=>{const d=document.querySelector('dialog[open]');if(d){d.close();return true;}if(globalThis.LifeRadar&&LifeRadar.currentView()!=='today'){LifeRadar.navigate('today');return true;}return false;})()",result->{if(!"true".equals(result))super.onBackPressed();});}
+    private void handleBack(){web.evaluateJavascript("(()=>{const d=document.querySelector('dialog[open]');if(d){d.close();return true;}if(globalThis.LifeRadar&&LifeRadar.currentView()!=='today'){LifeRadar.navigate('today');return true;}return false;})()",result->{if(!"true".equals(result))finish();});}
+    @Override public void onBackPressed(){handleBack();}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==30){ReminderReceiver.schedule(this,pendingReminders);Toast.makeText(this,results.length>0 && results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED ? "Task notifications enabled" : "Enable Life Radar notifications in app settings to receive reminders",Toast.LENGTH_LONG).show();}}
     @Override protected void onPause(){super.onPause();web.onPause();}
     @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
