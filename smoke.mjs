@@ -25,3 +25,26 @@ app.click({view:'memory'}); assert.match(app.node('#content').innerHTML,/Notes t
 app.click({view:'radar'}); assert.match(app.node('#content').innerHTML,/When did I last/);
 const bad = boot({tasks:[{id:'bad'}],radar:[],notes:[]}); assert.match(bad.node('#content').innerHTML,/A little room to begin/);
 console.log('Passed: empty state, quote, task capture, HTML escaping, start prompt, focus persistence, completion, postponement, navigation, invalid storage recovery.');
+const spending = boot(), now = new Date();
+const localDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const submitExpense = (values) => spending.node('#expense-form').onsubmit({preventDefault(){},target:{values:{title:'Lunch <b>test</b>',amount:'120.10',category:'Food & groceries',date:localDate(now),details:'',...values}}});
+spending.click({view:'spending'}); assert.match(spending.node('#content').innerHTML,/Your spending/);
+submitExpense({}); assert.equal(spending.state().expenses[0].cents,12010);
+assert.match(spending.node('#content').innerHTML,/₹120.10/); assert.match(spending.node('#content').innerHTML,/Lunch &lt;b&gt;test&lt;\/b&gt;/);
+for (const amount of ['0','-10','1.005','abc','1000000001']) submitExpense({amount});
+submitExpense({date:'2099-01-01'}); submitExpense({category:'Unknown'}); submitExpense({date:'2026-02-30'});
+assert.equal(spending.state().expenses.length,1);
+const priorYear = localDate(new Date(now.getFullYear()-1,0,1));
+const historic = boot({tasks:[],radar:[],notes:[],expenses:[{id:'old',title:'Old spending',details:'',date:priorYear,cents:8000,category:'Other'},{id:'recent',title:'Today spending',details:'',date:localDate(now),cents:1010,category:'Other'}]});
+historic.click({view:'spending'});
+for (const period of ['daily','weekly','monthly','yearly']) { historic.click({period}); assert.match(historic.node('#content').innerHTML,/₹10.10/); assert.ok(!historic.node('#content').innerHTML.includes('Old spending')); }
+const savedSpend = boot(spending.state()); savedSpend.click({view:'spending'}); assert.match(savedSpend.node('#content').innerHTML,/₹120.10/);
+spending.click({delete:'expenses:new-id'}); assert.equal(spending.state().expenses.length,0);
+const legacy = boot({tasks:[],radar:[],notes:[],focus:null}); legacy.click({view:'spending'}); assert.match(legacy.node('#content').innerHTML,/Start with your next purchase/);
+await legacy.node('#import').onchange({target:{files:[{size:100,text:async()=>JSON.stringify({tasks:[],radar:[],notes:[]})}],value:'backup.json'}});
+assert.deepEqual(legacy.state().expenses,[]);
+const expenseBackup = savedSpend.state();
+await legacy.node('#import').onchange({target:{files:[{size:100,text:async()=>JSON.stringify(expenseBackup)}],value:'backup.json'}});
+assert.equal(legacy.state().expenses[0].cents,12010);
+assert.match(legacy.node('#content').innerHTML,/₹120.10/);
+console.log('Passed: manual expenses, exact paise amounts, escaped descriptions, invalid amounts/dates/categories rejected, period filters, persistence, deletion and legacy backup migration.');
