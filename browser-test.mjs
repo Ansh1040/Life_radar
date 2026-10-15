@@ -93,6 +93,31 @@ try{
     assert.ok(brand.x+brand.width<=controls.x+1,`Compact header overlap in ${view}`);
   }
   console.log(`Compact header checks passed: ${expandedHeight}px at top, ${collapsedHeight}px while scrolling; Review content starts at ${Math.round(reviewTop)}px.`);
+  for(const width of [320,390,412]){
+    await page.setViewportSize({width,height:844});
+    await page.evaluate(()=>{scrollTo(0,0);LifeRadarInsets({left:45,width:10,top:34});});
+    for(const view of ['today','radar','spending','memory','review']){
+      await page.locator(`[data-view=${view}]`).click();
+      const bounds=await page.evaluate(()=>{
+        const header=document.querySelector('.topbar').getBoundingClientRect(),brand=document.querySelector('.topbar .brand').getBoundingClientRect(),controls=document.querySelector('.topbar-actions').getBoundingClientRect();
+        return {top:header.top,height:header.height,brandRight:brand.right,controlsLeft:controls.left,controlsRight:controls.right,overflow:document.documentElement.scrollWidth>innerWidth};
+      });
+      assert.equal(bounds.top,0,'Fullscreen header must use the top of the viewport');
+      assert.ok(bounds.height<=60,`Camera header too tall: ${bounds.height}`);
+      assert.ok(bounds.brandRight<=width*.45-6,'Title overlaps camera region');
+      assert.ok(bounds.controlsLeft>=width*.55+6,'Controls overlap camera region');
+      assert.ok(bounds.controlsRight<=width,'Controls outside screen');
+      assert.equal(bounds.overflow,false);
+    }
+  }
+  await page.setViewportSize({width:390,height:844});await page.locator('[data-view=today]').click();
+  await page.screenshot({path:new URL('./artifacts/fullscreen-camera-top.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1')});
+  await page.evaluate(()=>scrollTo(0,220));await page.waitForFunction(()=>document.documentElement.classList.contains('is-scrolled'));
+  assert.ok((await page.locator('.topbar').boundingBox()).height<=54);
+  await page.screenshot({path:new URL('./artifacts/fullscreen-camera-scrolled.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1')});
+  await page.evaluate(()=>{LifeRadarInsets({left:0,width:0,top:0});scrollTo(0,0);});
+  assert.equal(await page.locator('html').getAttribute('data-camera'),'false');
+  console.log('Fullscreen camera layout passed at 320px, 390px and 412px: no reserved top strip and no title/control collisions.');
   await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('life-radar-v1'));const base=d.expenses[0];d.expenses=Array.from({length:1000},(_,i)=>({...base,id:`stress-${i}`,title:`Expense ${i}`}));localStorage.setItem('life-radar-v1',JSON.stringify(d));});
   await page.reload();const start=performance.now();await page.locator('[data-view=spending]').click();await page.locator('#spending-calendar').waitFor();const latency=Math.round(performance.now()-start);
   console.log(`Browser checks passed: forms, edit source rule, real pointer swipes, timer, calendar, theme persistence, backup round-trip, 320px layout. 1,000-entry Spending render: ${latency}ms.`);

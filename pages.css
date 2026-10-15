@@ -77,3 +77,15 @@
   button,[data-calendar-day],.panel,.calendar-details{scroll-margin-top:70px;scroll-margin-bottom:90px}
   #toast{bottom:87px}
 }
+
+/* The camera is a local obstacle, not an empty band across the entire display. */
+@media(max-width:680px){
+  :root[data-camera="true"] .topbar{--header-gutter:12px;grid-template-columns:minmax(0,calc(var(--camera-left) - var(--header-gutter) - 8px)) calc(var(--camera-width) + 16px) minmax(0,1fr);gap:0;padding-inline:var(--header-gutter);padding-top:6px;padding-bottom:6px;min-height:max(58px,calc(var(--camera-bottom) + 8px))}
+  :root[data-camera="true"] .topbar .brand{grid-column:1;gap:0;font-size:20px;min-width:0}
+  :root[data-camera="true"] .topbar .brand-icon{display:none}
+  :root[data-camera="true"] .topbar .brand small{letter-spacing:.2px;font-size:6px;line-height:1.4;max-width:100%}
+  :root[data-camera="true"] .topbar #section-name{overflow-wrap:anywhere}
+  :root[data-camera="true"] .topbar-actions{grid-column:3;justify-self:end;gap:5px;margin:0}
+  :root[data-camera="true"].is-scrolled .topbar{min-height:max(52px,calc(var(--camera-bottom) + 6px));padding-block:5px}
+  :root[data-camera="true"] .topbar .theme-toggle,:root[data-camera="true"] .topbar #capture{width:32px;height:34px;min-height:34px}
+}

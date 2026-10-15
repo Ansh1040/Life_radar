@@ -17,6 +17,7 @@ public final class MainActivity extends Activity {
     private ValueCallback<Uri[]> upload;
     private String pendingExport;
     private String pendingReminders = "[]";
+    private String cameraInsets = "{\"left\":0,\"width\":0,\"top\":0}";
     private static final String HOST = "appassets.androidplatform.net";
     private static final Set<String> FILES = new HashSet<>(Arrays.asList("index.html","app.js","ui.js","styles.css","theme.css","pages.css"));
     @Override public void onCreate(Bundle state) {
@@ -31,9 +32,15 @@ public final class MainActivity extends Activity {
         setContentView(root);
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
+            android.view.WindowManager.LayoutParams layout = getWindow().getAttributes();
+            layout.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+            getWindow().setAttributes(layout);
             root.setOnApplyWindowInsetsListener((view,insets)->{
                 android.graphics.Insets safe = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout() | android.view.WindowInsets.Type.ime());
-                view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
+                // Draw from y=0. Reserve only the camera's actual horizontal bounds in the web header.
+                view.setPadding(safe.left,0,safe.right,safe.bottom);
+                android.view.DisplayCutout cutout = insets.getDisplayCutout();
+                root.post(()->publishCameraInsets(cutout,safe.left));
                 return android.view.WindowInsets.CONSUMED;
             });
             root.requestApplyInsets();
@@ -57,6 +64,7 @@ public final class MainActivity extends Activity {
         settings.setSupportMultipleWindows(false);
         web.addJavascriptInterface(new BackupBridge(), "AndroidBackup");
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view,String url){applyCameraInsets();}
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
                 String path = url.getPath();
@@ -90,6 +98,21 @@ public final class MainActivity extends Activity {
         });
         web.loadUrl("https://"+HOST+"/assets/index.html");
     }
+    private void publishCameraInsets(android.view.DisplayCutout cutout,int leftInset) {
+        int start=Integer.MAX_VALUE,end=0,bottom=0;
+        if(cutout!=null)for(android.graphics.Rect rect:cutout.getBoundingRects()){
+            if(rect.top<=0 && rect.bottom>0){start=Math.min(start,rect.left);end=Math.max(end,rect.right);bottom=Math.max(bottom,rect.bottom);}
+        }
+        int width=web.getWidth();
+        if(width>0 && start!=Integer.MAX_VALUE){
+            float left=Math.max(0,start-leftInset)*100f/width;
+            float gap=Math.max(0,end-start)*100f/width;
+            float top=bottom/getResources().getDisplayMetrics().density;
+            cameraInsets=String.format(Locale.US,"{\"left\":%.3f,\"width\":%.3f,\"top\":%.3f}",left,gap,top);
+        }else cameraInsets="{\"left\":0,\"width\":0,\"top\":0}";
+        applyCameraInsets();
+    }
+    private void applyCameraInsets(){web.evaluateJavascript("window.LifeRadarInsets&&window.LifeRadarInsets("+cameraInsets+")",null);}
     public final class BackupBridge {
         @JavascriptInterface public void syncReminders(String json) {
             if(json==null || json.length()>1000000)return;

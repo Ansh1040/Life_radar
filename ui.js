@@ -16,6 +16,14 @@
   const icon=key=>`<svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[key]}</svg>`;
   document.querySelectorAll('.symbol-nav [data-view]').forEach(button=>{button.innerHTML=icon(button.dataset.view)+`<span class="nav-active-label" aria-hidden="true">${identity[button.dataset.view].label}</span>`;});
   const topbar=document.querySelector('.topbar'), brand=document.querySelector('.brand');
+  globalThis.LifeRadarInsets=({left=0,width=0,top=0}={})=>{
+    const root=document.documentElement;
+    const hasCamera=Number.isFinite(left)&&Number.isFinite(width)&&Number.isFinite(top)&&left>=0&&width>0&&left+width<=100&&top>0;
+    root.dataset.camera=hasCamera?'true':'false';
+    root.style.setProperty('--camera-left',hasCamera?`${left}vw`:'0px');
+    root.style.setProperty('--camera-width',hasCamera?`${width}vw`:'0px');
+    root.style.setProperty('--camera-bottom',hasCamera?`${top}px`:'0px');
+  };
   topbar.querySelector(':scope > span')?.remove();topbar.prepend(brand);
   const sectionIcon=brand.querySelector('.brand-icon');sectionIcon.classList.add('section-icon');
   const controls=document.createElement('div'); controls.className='topbar-actions';
