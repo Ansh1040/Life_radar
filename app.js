@@ -13,13 +13,17 @@
   const allCategories = () => [...categories, ...data.customCategories];
   let data = fresh(), view = 'today', period = 'daily', selected = null, toastTimer;
   let editingExpense = null, entrySource = 'add-spending', entryMode = 'expense';
+  let editingEntry = null;
   let calendarMonth = today().slice(0, 7), calendarDay = today();
+  let moneyLimit = 60, dayLimit = 60;
+  const moneyRows = (entries,type,limit,action) => entries.slice(0,limit).map(x=>moneyRow(x,type)).join('') + (entries.length>limit ? `<button class="add-inline" ${action}>Show more (${entries.length-limit} remaining)</button>` : '');
   const validTime = value => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   const validStamp = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
   const metadataValid = x => (x.time === undefined || x.time === '' || validTime(x.time)) && (x.createdAt === undefined || validStamp(x.createdAt)) && (x.updatedAt === undefined || validStamp(x.updatedAt)) && (x.source === undefined || ['quick-capture','add-spending','add-income'].includes(x.source));
   const validDate = (v) => v === '' || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && dateKey(new Date(`${v}T12:00:00`)) === v);
   function validate(d) {
     if (!d || !['tasks', 'radar', 'notes'].every(k => Array.isArray(d[k]) && d[k].length <= 10000)) return false;
+    if (!d.tasks.every(x=>x && (x.reminderAt===undefined || x.reminderAt==='' || validStamp(x.reminderAt)))) return false;
     const base = x => x && typeof x.id === 'string' && typeof x.title === 'string' && x.title.length <= 180 && typeof x.details === 'string' && x.details.length <= 2000;
     const custom = d.customCategories ?? [];
     if (!Array.isArray(custom) || custom.length > 200 || !custom.every(c => typeof c === 'string' && c.trim() === c && c.length > 0 && c.length <= 60 && c !== '__new__')) return false;
@@ -36,7 +40,12 @@
   data.expenses ??= [];
   data.income ??= [];
   data.customCategories ??= [];
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch { notify('Storage unavailable or full. Export a backup before closing.'); } render(); }
+  function syncReminders() {
+    if (!globalThis.AndroidBackup?.syncReminders) return;
+    const reminders=data.tasks.filter(x=>!x.done && x.reminderAt && Date.parse(x.reminderAt)>Date.now()).map(x=>({id:x.id,title:x.title,at:Date.parse(x.reminderAt)}));
+    globalThis.AndroidBackup.syncReminders(JSON.stringify(reminders));
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); syncReminders(); } catch { notify('Storage unavailable or full. Export a backup before closing.'); } render(); }
   function isInPeriod(task) {
     if (task.due) {
       const d = new Date(`${task.due}T12:00:00`), now = new Date(); now.setHours(12, 0, 0, 0);
@@ -81,7 +90,7 @@
       cells.push(`<button class="calendar-day ${date === today() ? 'is-today' : ''}" data-calendar-day="${date}" aria-pressed="${date === calendarDay}" aria-label="${date}: spent ${money(sums.spent)}, earned ${money(sums.earned)}"><span>${day}</span><small>${sums.spent ? money(sums.spent) : '—'}</small>${sums.earned ? '<i class="income-dot" aria-label="Income logged"></i>' : ''}</button>`);
     }
     const monthTotals = [...daily.values()].reduce((s,x)=>({spent:s.spent+x.spent,earned:s.earned+x.earned}),{spent:0,earned:0});
-    return `<section class="panel" id="spending-calendar"><div class="panel-head"><div><h2>Spending calendar</h2><p class="helper">Select a day to see its entries. Amounts show spending; a green dot marks income.</p></div><button class="text-button" data-calendar-today>Today</button></div><div class="calendar-toolbar"><button class="small-button" data-calendar-shift="-1" aria-label="Previous month">←</button><h3>${first.toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</h3><button class="small-button" data-calendar-shift="1" aria-label="Next month">→</button></div><p class="helper">Month: ${money(monthTotals.spent)} spent · ${money(monthTotals.earned)} earned</p><div class="calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=>`<span class="calendar-weekday">${day}</span>`).join('')}${cells.join('')}</div><div class="calendar-details" aria-live="polite"><h3>${new Date(`${calendarDay}T12:00:00`).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</h3>${moneySummary(totalMoney(dayExpenses),totalMoney(dayIncome))}${dayExpenses.map(x=>moneyRow(x)).join('')}${dayIncome.map(x=>moneyRow(x,'income')).join('')}${!dayExpenses.length && !dayIncome.length ? '<p class="helper">No spending or income logged for this day.</p>' : ''}</div></section>`;
+    return `<section class="panel" id="spending-calendar"><div class="panel-head"><div><h2>Spending calendar</h2><p class="helper">Select a day to see its entries. Amounts show spending; a green dot marks income.</p></div><button class="text-button" data-calendar-today>Today</button></div><div class="calendar-toolbar"><button class="small-button" data-calendar-shift="-1" aria-label="Previous month">←</button><h3>${first.toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</h3><button class="small-button" data-calendar-shift="1" aria-label="Next month">→</button></div><p class="helper">Month: ${money(monthTotals.spent)} spent · ${money(monthTotals.earned)} earned</p><div class="calendar-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day=>`<span class="calendar-weekday">${day}</span>`).join('')}${cells.join('')}</div><div class="calendar-details" aria-live="polite"><h3>${new Date(`${calendarDay}T12:00:00`).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</h3>${moneySummary(totalMoney(dayExpenses),totalMoney(dayIncome))}${moneyRows(dayExpenses,'expense',dayLimit,'data-more-day')}${moneyRows(dayIncome,'income',dayLimit,'data-more-day')}${!dayExpenses.length && !dayIncome.length ? '<p class="helper">No spending or income logged for this day.</p>' : ''}</div></section>`;
   }
   function spendingPanel() {
     const now = new Date(), end = today(), start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -92,7 +101,7 @@
     entries.sort(recentFirst);
     const income = data.income.filter(x => x.date >= from && x.date <= end).sort(recentFirst);
     const total = totalMoney(entries), grouped = allCategories().map(category => ({category,total:totalMoney(entries.filter(x => x.category === category))})).filter(x => x.total).sort((a,b) => b.total-a.total);
-    return `<section class="panel"><div class="panel-head money-heading"><h2>Your spending & income</h2><div class="money-buttons"><button class="small-button" data-income>Add income ＋</button><button class="primary" data-expense>Add spending ＋</button></div></div>${tabs()}<p class="helper">${from} → ${end} · Manually logged · INR · Net is based on logged entries, not your bank balance.</p>${moneySummary(total,totalMoney(income))}</section><div class="columns"><div><section class="panel"><div class="panel-head"><h2>Expense log</h2><span class="helper">Latest first</span></div>${entries.length ? entries.map(x=>moneyRow(x)).join('') : empty('Start with your next purchase.', 'Tea, a bus ticket, groceries — every little expense has a place.')}<button class="add-inline" data-expense>＋ Log an expense</button></section><section class="panel"><div class="panel-head"><h2>Income log</h2><button class="text-button" data-income>＋ Add income</button></div>${income.length ? income.map(x=>moneyRow(x,'income')).join('') : '<p class="helper">Log money you’ve earned — salary, freelance work, or another source.</p>'}</section></div><section class="panel"><h2>Where it went</h2>${grouped.length ? grouped.map(x => `<div class="radar-item"><div class="row"><h3>${safe(x.category)}</h3><span class="helper">${money(x.total)}</span></div><div class="track"><i style="width:${x.total/total*100}%"></i></div><span class="helper">${Math.round(x.total/total*100)}% of this period</span></div>`).join('') : '<p class="helper">Your category breakdown appears as you log spending.</p>'}</section></div>${spendingCalendar()}`;
+    return `<section class="panel"><div class="panel-head money-heading"><h2>Your spending & income</h2><div class="money-buttons"><button class="small-button" data-income>Add income ＋</button><button class="primary" data-expense>Add spending ＋</button></div></div>${tabs()}<p class="helper">${from} → ${end} · Manually logged · INR · Net is based on logged entries, not your bank balance.</p>${moneySummary(total,totalMoney(income))}</section><div class="columns"><div><section class="panel"><div class="panel-head"><h2>Expense log</h2><span class="helper">Latest first</span></div>${entries.length ? moneyRows(entries,'expense',moneyLimit,'data-more-money') : empty('Start with your next purchase.', 'Tea, a bus ticket, groceries — every little expense has a place.')}<button class="add-inline" data-expense>＋ Log an expense</button></section><section class="panel"><div class="panel-head"><h2>Income log</h2><button class="text-button" data-income>＋ Add income</button></div>${income.length ? moneyRows(income,'income',moneyLimit,'data-more-money') : '<p class="helper">Log money you’ve earned — salary, freelance work, or another source.</p>'}</section></div><section class="panel"><h2>Where it went</h2>${grouped.length ? grouped.map(x => `<div class="radar-item"><div class="row"><h3>${safe(x.category)}</h3><span class="helper">${money(x.total)}</span></div><div class="track"><i style="width:${x.total/total*100}%"></i></div><span class="helper">${Math.round(x.total/total*100)}% of this period</span></div>`).join('') : '<p class="helper">Your category breakdown appears as you log spending.</p>'}</section></div>${spendingCalendar()}`;
   }
   function render() {
     $('#section-name').textContent = {today:'Today',radar:'Life radar',spending:'Spending',memory:'Notes to self',review:'Review'}[view];
@@ -113,8 +122,20 @@
       $('#content').innerHTML = `<section class="panel"><div class="panel-head"><h2>Your perspective</h2></div>${tabs()}<p class="helper">Completed tasks use their completion date. Open tasks use their due date or chosen time frame.</p></section><div class="review-grid"><section class="panel"><h2>Things you moved forward</h2>${taskList(completed.filter(t => { const date = t.completedAt; return date && isInPeriod({ ...t, due: date }); }))}</section><section class="panel"><h2>Still on your mind</h2>${taskList(open.filter(isInPeriod))}</section><section class="panel"><h2>A gentle check-in</h2><p class="helper">${attention().length ? `${attention().length} recurring check-in${attention().length === 1 ? '' : 's'} could use your attention.` : 'Your recurring check-ins are up to date.'}</p><button class="text-button" data-view="radar">Visit your radar →</button></section><section class="panel"><h2>Keep a copy of your life</h2><p class="helper">Your entries are saved in this browser. Export a backup to keep a copy or move to another device.</p><button class="small-button" data-backup>Export backup ↗</button><button class="text-button" data-restore>Restore backup</button></section></div>`;
     }
     renderFocus();
+    globalThis.LifeRadarUI?.enhance();
   }
-  function capture(kind = 'task') { $('#entry-form').reset(); $('#kind').value = kind; updateFields(); $('#editor').showModal(); setTimeout(() => $('#entry-form [name="title"]').focus(), 30); }
+  function capture(kind = 'task', id = null) {
+    const collection = {task:'tasks',radar:'radar',note:'notes'}[kind];
+    const existing = id ? data[collection]?.find(x=>x.id===id) : null;
+    if (id && !existing) return;
+    editingEntry = existing ? {kind, id} : null;
+    $('#entry-form').reset(); $('#kind').value = kind; $('#kind').disabled = Boolean(existing);
+    updateFields();
+    if (existing) for (const field of ['title','details','period','due','minutes','interval','resurface']) { const input = $(`#entry-form [name="${field}"]`); if (input && existing[field] !== undefined) input.value=existing[field]; }
+    const reminderInput=$('#entry-form [name="reminderAt"]');
+    if(reminderInput){reminderInput.value='';if(existing?.reminderAt){const date=new Date(existing.reminderAt);reminderInput.value=`${dateKey(date)}T${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;}}
+    $('#editor').showModal(); setTimeout(() => $('#entry-form [name="title"]').focus(), 30);
+  }
   function updateFields() { const k = $('#kind').value; for (const type of ['task','radar','note']) document.querySelectorAll(`.${type}-fields`).forEach(e => { e.hidden = k !== type; e.querySelectorAll('input,select').forEach(i => i.disabled = k !== type); if (e.matches('input,select')) e.disabled = k !== type; }); }
   $('#kind').onchange = () => { const kind = $('#kind').value; if (kind === 'expense' || kind === 'income') { $('#editor').close(); captureExpense('quick-capture',null,kind); } else updateFields(); };
   function updateCustomCategory() {
@@ -125,14 +146,14 @@
   }
   $('#expense-category').onchange = () => { updateCustomCategory(); if (!$('#custom-category-field').hidden) $('#custom-category').focus(); };
   function captureExpense(source = 'add-spending', id = null, mode = 'expense') {
-    const existing = id ? data.expenses.find(x => x.id === id) : null;
-    if (id && (!existing || existing.source !== 'quick-capture')) { notify('Only Quick Capture expenses can be edited.'); return; }
+    const existing = id ? (mode === 'income' ? data.income : data.expenses).find(x => x.id === id) : null;
+    if (id && (!existing || (mode === 'expense' && existing.source !== 'quick-capture'))) { notify('Only Quick Capture expenses can be edited.'); return; }
     editingExpense = id; entryMode = mode; entrySource = existing?.source || source;
     $('#expense-form').reset();
     $('#expense-category').innerHTML = allCategories().map(c => `<option value="${safe(c)}">${safe(c)}</option>`).join('') + '<option value="__new__">＋ Add a category…</option>';
     $('#expense-category').value = existing?.category || categories[0]; updateCustomCategory();
     $('#expense-category-field').hidden = mode === 'income'; $('#expense-category').disabled = mode === 'income';
-    $('#expense-heading').textContent = id ? 'Edit your spending.' : mode === 'income' ? 'Log money earned.' : 'Log your spending.';
+    $('#expense-heading').textContent = id ? (mode === 'income' ? 'Edit your income.' : 'Edit your spending.') : mode === 'income' ? 'Log money earned.' : 'Log your spending.';
     $('#money-title-label').textContent = mode === 'income' ? 'Where did the money come from?' : 'What did you spend on?';
     $('#expense-submit').textContent = id ? 'Save changes ↗' : mode === 'income' ? 'Save income ↗' : 'Save spending ↗';
     $('#entry-origin').textContent = mode === 'expense' ? (entrySource === 'quick-capture' ? 'Quick Capture · You can edit this entry after saving.' : 'Add spending · This entry cannot be edited after saving.') : 'Record the money you received.';
@@ -149,8 +170,8 @@
   $('#close-expense').onclick = () => $('#expense-editor').close();
   $('#expense-form').onsubmit = e => {
     e.preventDefault(); const f = new FormData(e.target), title = String(f.get('title') || '').trim(), amount = String(f.get('amount') || '').trim(), date = String(f.get('date') || '');
-    const existing = editingExpense ? data.expenses.find(x => x.id === editingExpense) : null;
-    if (editingExpense && (!existing || existing.source !== 'quick-capture')) { notify('Only Quick Capture expenses can be edited.'); return; }
+    const existing = editingExpense ? (entryMode === 'income' ? data.income : data.expenses).find(x => x.id === editingExpense) : null;
+    if (editingExpense && (!existing || (entryMode === 'expense' && existing.source !== 'quick-capture'))) { notify('Only Quick Capture expenses can be edited.'); return; }
     const time = String(f.get('time') || '');
     if (time && !validTime(time)) { notify('Enter a valid time.'); return; }
     let category = String(f.get('category') || ''), newCategory = false;
@@ -172,8 +193,27 @@
     $('#expense-editor').close(); save(); notify(existing ? 'Expense updated.' : entryMode === 'income' ? 'Income logged.' : 'Spending logged.');
     editingExpense = null;
   };
-  $('#entry-form').onsubmit = e => { e.preventDefault(); const f = new FormData(e.target), title = String(f.get('title')).trim(); if (!title) return; const base = { id: crypto.randomUUID(), title, details: String(f.get('details') || '').trim() }, kind = f.get('kind'); if (kind === 'task') data.tasks.push({...base,period:f.get('period'),due:String(f.get('due') || ''),minutes:Number(f.get('minutes')),done:false,completedAt:''}); else if (kind === 'radar') data.radar.push({...base,interval:Number(f.get('interval')),lastDone:''}); else data.notes.push({...base,createdAt:today(),resurface:String(f.get('resurface') || '')}); $('#editor').close(); save(); notify('Saved. A little less on your mind.'); };
+  $('#entry-form').onsubmit = e => {
+    e.preventDefault(); const f = new FormData(e.target), title=String(f.get('title') || '').trim(), kind=editingEntry?.kind || f.get('kind');
+    if (!title || title.length>180 || !['task','radar','note'].includes(kind)) { notify('Please enter a description.'); return; }
+    const fields={title,details:String(f.get('details') || '').trim().slice(0,2000)};
+    if(kind==='task'){
+      const reminder=String(f.get('reminderAt') || '');
+      if(reminder){const parsed=new Date(reminder);if(!Number.isFinite(parsed.getTime())){notify('Choose a valid reminder time.');return;}const previous=editingEntry?data.tasks.find(x=>x.id===editingEntry.id):null;if(parsed.getTime()<=Date.now() && previous?.reminderAt!==parsed.toISOString()){notify('Choose a reminder time in the future.');return;}fields.reminderAt=parsed.toISOString();}
+      else fields.reminderAt='';
+    }
+    if (kind==='task') { Object.assign(fields,{period:f.get('period'),due:String(f.get('due') || ''),minutes:Number(f.get('minutes'))}); if (!(fields.period in periods) || !validDate(fields.due) || !Number.isInteger(fields.minutes) || fields.minutes<1 || fields.minutes>1440) { notify('Enter a valid date and duration from 1 to 1440 minutes.'); return; } }
+    if (kind==='radar') { fields.interval=Number(f.get('interval')); if (!Number.isInteger(fields.interval) || fields.interval<1 || fields.interval>3660) { notify('Choose a check-in interval from 1 to 3660 days.'); return; } }
+    if (kind==='note') { fields.resurface=String(f.get('resurface') || ''); if (!validDate(fields.resurface)) return; }
+    const list=data[{task:'tasks',radar:'radar',note:'notes'}[kind]], existing=editingEntry ? list.find(x=>x.id===editingEntry.id) : null;
+    if (editingEntry && !existing) return;
+    if (existing) Object.assign(existing,fields);
+    else list.push({id:crypto.randomUUID(),...fields,...(kind==='task'?{done:false,completedAt:''}:kind==='radar'?{lastDone:''}:{createdAt:today()})});
+    editingEntry=null; $('#editor').close(); save(); notify('Saved. A little less on your mind.');
+  };
   document.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+    if (b.hasAttribute('data-more-money')) { moneyLimit+=60; render(); }
+    if (b.hasAttribute('data-more-day')) { dayLimit+=60; render(); }
     if (b.dataset.view) { view = b.dataset.view; render(); }
     if (b.dataset.period) { period = b.dataset.period; render(); }
     if (b.dataset.add) capture(b.dataset.add);
@@ -197,10 +237,25 @@
   $('#start-task').onclick = () => { const t = data.tasks.find(t => t.id === selected); if (!t) return; if (data.focus && data.focus.id !== t.id && !confirm('Replace your current focus session?')) return; if (data.focus?.id !== t.id) data.focus = {id:t.id,ends:Date.now() + t.minutes * 60000}; $('#decision').close(); save(); };
   $('#later-task').onclick = () => { const t = data.tasks.find(t => t.id === selected); if (!t) return; const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1); t.due = dateKey(tomorrow); if (data.focus?.id === t.id) data.focus = null; $('#decision').close(); save(); notify('Moved to tomorrow. A conscious choice is progress too.'); };
   function renderFocus() { const el = $('#focus'), t = data.tasks.find(t => t.id === data.focus?.id); el.hidden = !t; if (!t) return; const left = Math.max(0,Math.ceil((data.focus.ends - Date.now()) / 1000)); el.innerHTML = `<div>Focusing on: ${safe(t.title)}<span>${left ? 'One thing. Right now.' : 'Time’s up. Finish when you’re ready.'}</span></div><strong>${String(Math.floor(left/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}</strong><div><button class="small-button" data-finish-focus>Mark done ✓</button> <button class="text-button" data-stop-focus>Stop</button></div>`; }
-  setInterval(() => { const active = document.activeElement; if (!$('#focus').contains(active)) renderFocus(); }, 1000);
+  setInterval(() => {
+    if (!data.focus || document.hidden) return;
+    const left=Math.max(0,Math.ceil((data.focus.ends-Date.now())/1000)), clock=$('#focus strong'), status=$('#focus span');
+    if (clock) clock.textContent=`${String(Math.floor(left/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}`;
+    if (status) status.textContent=left?'One thing. Right now.':'Time’s up. Finish when you’re ready.';
+  },1000);
   let lastDay = today(); setInterval(() => { if (today() !== lastDay) { lastDay = today(); render(); } }, 30000);
-  function backup() { const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = `life-radar-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url),1000); }
+  function backup() { const json=JSON.stringify(data,null,2); if (globalThis.AndroidBackup?.exportJson) { globalThis.AndroidBackup.exportJson(json); return; } const blob = new Blob([json],{type:'application/json'}), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = `life-radar-${today()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url),1000); }
   $('#export').onclick = backup;
   $('#import').onchange = async e => { try { const file = e.target.files[0]; if (!file) return; if (file.size > 5000000) throw Error('Backup is too large.'); const next = JSON.parse(await file.text()); if (!validate(next)) throw Error('This isn’t a valid Life Radar backup.'); if (!confirm('Replace your current Life Radar entries with this backup? Export a copy first if you need them.')) return; data = {tasks:next.tasks,radar:next.radar,notes:next.notes,expenses:next.expenses || [],income:next.income || [],customCategories:next.customCategories || [],focus:null}; save(); notify('Your backup has been restored.'); } catch (err) { notify(err.message || 'Could not restore this file.'); } finally { e.target.value = ''; } };
+  globalThis.LifeRadar = {
+    notify, render, backup,
+    navigate(next) { if (['today','radar','spending','memory','review'].includes(next)) { view=next; render(); } },
+    currentView:()=>view,
+    getReminder:(id)=>data.tasks.find(x=>x.id===id)?.reminderAt || '',
+    canEdit(type,id) { const entry=data[type]?.find(x=>x.id===id); return Boolean(entry && (type!=='expenses' || entry.source==='quick-capture')); },
+    edit(type,id) { if (type==='expenses') captureExpense('quick-capture',id); else if(type==='income') captureExpense('add-income',id,'income'); else { const kind={tasks:'task',radar:'radar',notes:'note'}[type]; if(kind) capture(kind,id); } },
+    remove(type,id) { if (!['tasks','radar','notes','expenses','income'].includes(type)) return; if(!confirm('Delete this entry? This cannot be undone.')) return; data[type]=data[type].filter(x=>x.id!==id); if(data.focus?.id===id)data.focus=null; save(); }
+  };
   render();
+  syncReminders();
 })();

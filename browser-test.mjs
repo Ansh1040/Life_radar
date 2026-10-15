@@ -1,0 +1,68 @@
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+const {chromium}=await import(process.argv[2] ? pathToFileURL(process.argv[2]).href : 'playwright');
+const browser=await chromium.launch({channel:'msedge',headless:true});
+const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+await context.addInitScript(()=>{globalThis.AndroidBackup={syncReminders:json=>globalThis.testReminders=JSON.parse(json)};});
+const page=await context.newPage();const errors=[];
+page.on('pageerror',error=>errors.push(error.message));
+await mkdir(new URL('./artifacts/',import.meta.url),{recursive:true});
+try{
+  await page.goto('http://127.0.0.1:5186/',{waitUntil:'networkidle'});
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.locator('#capture').click();await page.locator('#entry-form [name=title]').fill('Test task');
+  const reminder=await page.evaluate(()=>{const d=new Date(Date.now()+3600000);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;});
+  await page.locator('#entry-form [name=reminderAt]').fill(reminder);await page.locator('#entry-form button[type=submit]').click();
+  assert.equal(await page.evaluate(()=>testReminders.length),1);
+  await page.locator('.task .entry-menu').click();await page.getByRole('button',{name:'Edit entry',exact:true}).click();
+  await page.locator('#entry-form [name=title]').fill('Updated task');await page.locator('#entry-form button[type=submit]').click();
+  assert.equal(await page.locator('.task-title').first().textContent(),'Updated task');
+  assert.equal(await page.evaluate(()=>testReminders[0].title),'Updated task');
+  await page.locator('.task .start').click();await page.locator('#start-task').click();
+  const focusedClock=await page.locator('#focus strong').textContent();
+  await page.waitForFunction(previous=>document.querySelector('#focus strong').textContent!==previous,focusedClock,{timeout:4000});
+  await page.locator('[data-view=spending]').click();
+  async function fillMoney(title,amount){await page.locator('#expense-form [name=title]').fill(title);await page.locator('#expense-form [name=amount]').fill(amount);await page.locator('#expense-submit').click();}
+  await page.locator('#capture').click();await fillMoney('Quick coffee','80');
+  const quickId=await page.evaluate(()=>JSON.parse(localStorage.getItem('life-radar-v1')).expenses[0].id);
+  await page.locator(`[data-edit-expense="${quickId}"]`).first().click();await page.locator('#expense-form [name=amount]').fill('90');await page.locator('#expense-submit').click();
+  await page.locator('[data-expense]').first().click();await fillMoney('Fixed lunch','180');
+  const fixedId=await page.evaluate(()=>JSON.parse(localStorage.getItem('life-radar-v1')).expenses[1].id);
+  assert.equal(await page.locator(`[data-edit-expense="${fixedId}"]`).count(),0);
+  await page.locator('[data-income]').first().click();await fillMoney('Salary','5000');
+  assert.ok((await page.locator('.money-summary').first().textContent()).includes('4,730'));
+  const quickRow=page.locator(`[data-swipe-id="${quickId}"]`).first();await quickRow.scrollIntoViewIfNeeded();
+  const box=await quickRow.boundingBox();
+  await page.mouse.move(box.x+45,box.y+20);await page.mouse.down();await page.mouse.move(box.x+130,box.y+20,{steps:8});await page.mouse.up();
+  assert.equal(await page.locator('#expense-editor').isVisible(),true);await page.locator('#close-expense').click();
+  const row2=page.locator(`[data-swipe-id="${fixedId}"]`).first();await row2.scrollIntoViewIfNeeded();const box2=await row2.boundingBox();
+  await page.mouse.move(box2.x+140,box2.y+20);await page.mouse.down();await page.mouse.move(box2.x+45,box2.y+20,{steps:8});await page.mouse.up();
+  assert.equal(await page.locator('.actions-sheet').isVisible(),true);assert.equal(await page.locator('.actions-sheet').getByRole('button',{name:'Edit entry'}).count(),0);
+  await page.locator('.actions-sheet').getByRole('button',{name:'Cancel',exact:true}).click();
+  const today=await page.evaluate(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;});
+  await page.locator(`[data-calendar-day="${today}"]`).click();assert.ok((await page.locator('.calendar-details').textContent()).includes('Quick coffee'));
+  await page.locator('[data-view=today]').click();await page.evaluate(()=>scrollTo(0,0));
+  await page.screenshot({path:new URL('./artifacts/mobile-dark.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1'),fullPage:true});
+  await page.getByRole('button',{name:'Switch to light mode',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  await page.reload();assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('life-radar-v1')).income.length),1);
+  await page.screenshot({path:new URL('./artifacts/mobile-light.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1'),fullPage:true});
+  // Real file export/import, including application data and the native export fallback contract.
+  const downloadEvent=page.waitForEvent('download');await page.locator('[data-export-mobile]').click();const download=await downloadEvent;const backupFile=new URL('./artifacts/test-backup.json',import.meta.url).pathname.replace(/^\/(\w:)/,'$1');await download.saveAs(backupFile);
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#import').setInputFiles(backupFile);
+  await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('restored'));
+  await page.setViewportSize({width:320,height:740});
+  for(const view of ['today','radar','spending','memory','review']){await page.locator(`[data-view=${view}]`).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Overflow in ${view}`);}
+  await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('life-radar-v1'));const base=d.expenses[0];d.expenses=Array.from({length:1000},(_,i)=>({...base,id:`stress-${i}`,title:`Expense ${i}`}));localStorage.setItem('life-radar-v1',JSON.stringify(d));});
+  await page.reload();const start=performance.now();await page.locator('[data-view=spending]').click();await page.locator('#spending-calendar').waitFor();const latency=Math.round(performance.now()-start);
+  console.log(`Browser checks passed: forms, edit source rule, real pointer swipes, timer, calendar, theme persistence, backup round-trip, 320px layout. 1,000-entry Spending render: ${latency}ms.`);
+  assert.ok(latency<1500,'Large ledger render exceeded 1.5 seconds');
+  assert.ok(await page.locator('[data-more-money]').count()>0);
+  assert.ok(await page.locator('.expense').count()<=122);
+  await page.locator('[data-more-money]').first().click();assert.ok(await page.locator('.expense').count()>121);
+  assert.deepEqual(errors,[]);
+  await page.locator('[data-view=today]').click();await page.locator('[data-complete]').first().click();assert.equal(await page.evaluate(()=>testReminders.length),0);
+  assert.deepEqual(errors,[]);console.log('No uncaught browser errors.');
+}finally{await context.close();await browser.close();}

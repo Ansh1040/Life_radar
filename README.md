@@ -6,7 +6,21 @@ Run `node serve.mjs` from this directory and open http://127.0.0.1:5186. Keep th
 
 Includes daily, weekly, monthly and yearly tasks; a start-now decision with a persistent focus timer; recurring check-ins; scheduled notes to self; period reviews; JSON export and validated restore. Start with your own entries; there is no invented personal data. Tasks do not automatically repeat. A radar check-in records the latest completion date, not a historical log. Future notes remain visible in Notes to self and appear on Today when their resurface date arrives.
 
-Data is stored only in this browser's localStorage. Clearing browser data removes it. Export backups regularly. No account, cloud synchronization, background notifications or Android APK is included in this first version. System fonts work offline; optional Google Fonts need connectivity on their first load. Dates use the device's local timezone.
+Data is stored locally on the device. Clearing browser/app data removes it. Export backups regularly. No account or cloud synchronization is included. System fonts and all app files work offline. Dates use the device's local timezone.
+
+## Android app
+
+The Indigo Rose theme includes saved light/dark mode, bottom icon navigation, swipe between sections on empty space, and swipe entry actions. Swipe right to edit eligible entries; swipe left to open actions. Deletion always requires confirmation. The three-dot menu offers the same actions without gestures. Tasks, check-ins, notes and income are editable; expenses retain the Quick Capture-only editing rule. Large expense logs load 60 entries at a time.
+
+Build on Windows with the Android 33 SDK/build tools and JDK 19: `powershell -ExecutionPolicy Bypass -File android/build.ps1 -SdkRoot 'C:\Users\ansh0\AppData\Local\Android\Sdk'`. The output is `artifacts/LifeRadar-1.0.0.apk`, a personal sideload build signed with a locally generated key in ignored `android/signing`. Keep that key for future app updates. This is not a Play Store release. Minimum Android version: 8.0. No native CPU libraries and no internet permission are used. Android System WebView should be current.
+
+Transfer the APK to the OnePlus 13 and open it in Files, allowing installation from that source when Android asks. Local browser entries do not automatically transfer: export a browser backup and restore it in the app. Native backup export uses Android's file destination picker.
+
+## Reminder notifications
+
+Set an optional Reminder date and time in a task's capture/edit form. Grant notification permission when prompted. The bell button opens Android notification settings. Completing/deleting a task or clearing its reminder cancels the pending alarm; editing a task reschedules it. Pending reminders are restored after restart or app update. Reminders use battery-friendly inexact alarms, so Android/OxygenOS can delay them. Force-stopping the app disables alarms until it is opened again. If delivery is delayed, check Life Radar's notifications and background battery settings on the phone. This version supports one-time task reminders, not recurring check-in notifications.
+
+Validation: `node smoke.mjs`; `node browser-test.mjs <absolute-path-to-playwright/index.mjs>` tests mobile forms, swipes, timer, notifications bridge, theme persistence, backup restore, narrow layout and a 1,000-entry ledger in isolated headless Edge. Real-device reminder delivery must be checked on the phone.
 
 ## Spending
 
